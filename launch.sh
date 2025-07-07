@@ -36,7 +36,7 @@ trap cleanup EXIT
 
 # Start MLX server in background
 echo "🤖 Starting MLX server on port 8080..."
-python -m mlx_lm \
+python -m mlx_lm server \
     --model mlx-community/Mistral-7B-Instruct-v0.3-4bit \
     --host 127.0.0.1 \
     --port 8080 &

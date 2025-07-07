@@ -39,32 +39,34 @@ class Config:
     # LM Studio Configuration
     LMSTUDIO_URL = os.environ.get('LMSTUDIO_URL', 'http://localhost:1234')
 
-# Hard-coded prompts
-ANALYSIS_PROMPT = """You are an expert prompt engineer. Analyze the following prompt and provide a detailed assessment covering:
-
-1. **Clarity**: How clear and unambiguous is the prompt?
-2. **Specificity**: Does it provide enough context and constraints?
-3. **Structure**: Is it well-organized and logical?
-4. **Completeness**: Are there missing elements that would improve results?
-5. **Potential Issues**: What problems might arise with this prompt?
-
-Provide specific, actionable feedback.
-
-Prompt to analyze:
-{prompt}
-
-Analysis:"""
-
-OPTIMIZATION_PROMPT = """You are an expert prompt engineer. Based on the analysis below, create an optimized version of the original prompt that addresses the identified issues and incorporates best practices.
-
-Original prompt:
-{original_prompt}
-
-Analysis:
-{analysis}
-
-Optimized prompt:"""
-
+    # Prompt refiners - load as class methods to handle errors properly
+    @classmethod
+    def load_prompt_template(cls, filename: str) -> str:
+        """Load a prompt template file with proper error handling"""
+        try:
+            # Use absolute path relative to this script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(script_dir, 'templates', filename)
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.error(f"Prompt template file not found: {filename}")
+            return f"Error: Template file '{filename}' not found"
+        except Exception as e:
+            logger.error(f"Error reading prompt template {filename}: {e}")
+            return f"Error loading template: {e}"
+    
+    @classmethod
+    def get_prompt_refiner_1(cls) -> str:
+        """Get the first prompt refiner template"""
+        return cls.load_prompt_template('prompt.refiner.part1.md')
+    
+    @classmethod
+    def get_prompt_refiner_2(cls) -> str:
+        """Get the second prompt refiner template"""
+        return cls.load_prompt_template('prompt.refiner.part2.md')
+        
 class LLMBackend:
     """Abstract base for LLM backends"""
     
@@ -209,12 +211,12 @@ class PromptOptimizer:
     
     def analyze_prompt(self, prompt: str) -> str:
         """Analyze a prompt using the selected backend"""
-        analysis_input = ANALYSIS_PROMPT.format(prompt=prompt)
+        analysis_input = Config.get_prompt_refiner_1().format(prompt=prompt)
         return self.backend.generate(analysis_input)
     
     def optimize_prompt(self, original_prompt: str, analysis: str) -> str:
         """Optimize a prompt based on analysis"""
-        optimization_input = OPTIMIZATION_PROMPT.format(
+        optimization_input = Config.get_prompt_refiner_2().format(
             original_prompt=original_prompt,
             analysis=analysis
         )

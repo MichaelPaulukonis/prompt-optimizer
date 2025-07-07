@@ -140,4 +140,5 @@ This evaluation prompt is designed for **intermediate to advanced prompt enginee
 Paste the prompt you want evaluated between triple backticks (```), ensuring it is complete and ready for review.
 
 ```
+{prompt}
 ```
