@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  prompt-optimizer:
+    build: .
+    ports:
+      - "6000:6000"
+    environment:
+      - LLM_BACKEND=ollama
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=llama2
+    depends_on:
+      - ollama
+    networks:
+      - prompt-optimizer-network
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - prompt-optimizer-network
+    # Uncomment if you have NVIDIA GPU support
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+volumes:
+  ollama_data:
+
+networks:
+  prompt-optimizer-network:
+    driver: bridge

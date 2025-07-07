@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Optimizer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Prompt Optimizer</h1>
+            <p>Analyze and optimize your prompts using local LLMs</p>
+        </header>
+
+        <div class="status-bar">
+            <h3>Backend Status</h3>
+            <div class="backend-status">
+                {% for name, available in backend_status.items() %}
+                <span class="status-badge {{ 'available' if available else 'unavailable' }}">
+                    {{ name }}: {{ 'Available' if available else 'Unavailable' }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <main>
+            <div class="input-section">
+                <h2>📝 Input Prompt</h2>
+                <textarea 
+                    id="promptInput" 
+                    placeholder="Enter your prompt here for analysis and optimization..."
+                    rows="8"
+                ></textarea>
+                <button id="optimizeBtn" onclick="optimizePrompt()">
+                    🔄 Analyze & Optimize
+                </button>
+            </div>
+
+            <div id="loadingSection" class="loading-section" style="display: none;">
+                <div class="loading-spinner"></div>
+                <p>Processing your prompt... This may take a moment.</p>
+            </div>
+
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <div class="result-box">
+                    <h2>📊 Analysis</h2>
+                    <div id="analysisResult" class="result-content"></div>
+                </div>
+
+                <div class="result-box">
+                    <h2>✨ Optimized Prompt</h2>
+                    <div id="optimizedResult" class="result-content"></div>
+                    <button onclick="copyToClipboard('optimizedResult')" class="copy-btn">
+                        📋 Copy Optimized Prompt
+                    </button>
+                </div>
+
+                <div class="metadata">
+                    <small>Backend used: <span id="backendUsed"></span></small>
+                </div>
+            </div>
+
+            <div id="errorSection" class="error-section" style="display: none;">
+                <h2>❌ Error</h2>
+                <div id="errorMessage" class="error-content"></div>
+                <button onclick="hideError()" class="error-close">Close</button>
+            </div>
+        </main>
+
+        <footer>
+            <p>
+                <a href="/api/status" target="_blank">System Status</a> | 
+                <a href="https://github.com/yourusername/prompt-optimizer" target="_blank">GitHub</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        async function optimizePrompt() {
+            const promptInput = document.getElementById('promptInput');
+            const prompt = promptInput.value.trim();
+            
+            if (!prompt) {
+                showError('Please enter a prompt to optimize.');
+                return;
+            }
+
+            // Show loading state
+            showLoading();
+            hideResults();
+            hideError();
+
+            try {
+                const response = await fetch('/api/optimize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showResults(data.analysis, data.optimized_prompt, data.backend);
+                } else {
+                    showError(data.error || 'An unknown error occurred.');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingSection').style.display = 'block';
+            document.getElementById('optimizeBtn').disabled = true;
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('optimizeBtn').disabled = false;
+        }
+
+        function showResults(analysis, optimized, backend) {
+            document.getElementById('analysisResult').textContent = analysis;
+            document.getElementById('optimizedResult').textContent = optimized;
+            document.getElementById('backendUsed').textContent = backend;
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function hideResults() {
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorSection').style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('errorSection').style.display = 'none';
+        }
+
+        async function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent;
+            
+            try {
+                await navigator.clipboard.writeText(text);
+                
+                // Show feedback
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                showError('Failed to copy to clipboard. Please copy manually.');
+            }
+        }
+
+        // Allow Enter + Ctrl/Cmd to submit
+        document.getElementById('promptInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                optimizePrompt();
+            }
+        });
+
+        // Auto-focus the input
+        document.getElementById('promptInput').focus();
+    </script>
+</body>
+</html>
