@@ -58,7 +58,7 @@ done
 
 # Start Flask app in background
 echo "🌐 Starting Flask app on port 5001..."
-python app_mlx_api.py &
+python app.py &
 FLASK_PID=$!
 
 # Wait for Flask app to start

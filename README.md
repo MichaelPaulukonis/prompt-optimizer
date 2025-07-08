@@ -132,8 +132,8 @@ When `LLM_BACKEND=auto` (default), the app selects backends in this order:
 
 ```
 prompt-optimizer/
-├── app_mlx_api.py         # Main Flask application (MLX API version)
-├── app.py                 # Legacy Flask app (direct MLX integration)
+├── app.py                 # Main Flask application (MLX API version)
+├── app_legacy.py          # Legacy Flask app (direct MLX integration)
 ├── launch.sh              # One-command launcher script
 ├── templates/
 │   └── index.html         # Web interface

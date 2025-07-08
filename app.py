@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Prompt Optimizer Flask App
+Prompt Optimizer Flask App - MLX API Server Version
 
-A simple web application for analyzing and optimizing prompts using local LLMs.
-Supports MLX (native macOS), Ollama, and LM Studio backends.
+Uses mlx_lm.server as a backend API instead of direct MLX integration.
+This follows the recommended pattern from the MLX community.
 """
 
 import os
@@ -11,7 +11,7 @@ import sys
 import json
 import logging
 from typing import Dict, Any, Optional, Tuple
-from flask import Flask, render_template, request, jsonify, flash
+from flask import Flask, render_template, request, jsonify
 import requests
 
 # Configure logging
@@ -24,9 +24,10 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
 # Configuration
 class Config:
     # LLM Backend selection
-    LLM_BACKEND = os.environ.get('LLM_BACKEND', 'auto')  # auto, mlx, ollama, lmstudio
+    LLM_BACKEND = os.environ.get('LLM_BACKEND', 'auto')
     
-    # MLX Configuration
+    # MLX API Server Configuration (using mlx_lm.server)
+    MLX_API_URL = os.environ.get('MLX_API_URL', 'http://localhost:8080')
     MLX_MODEL = os.environ.get('MLX_MODEL', 'mlx-community/Mistral-7B-Instruct-v0.3-4bit')
     MLX_MAX_TOKENS = int(os.environ.get('MLX_MAX_TOKENS', '1024'))
     MLX_TEMPERATURE = float(os.environ.get('MLX_TEMPERATURE', '0.7'))
@@ -37,34 +38,35 @@ class Config:
     
     # LM Studio Configuration
     LMSTUDIO_URL = os.environ.get('LMSTUDIO_URL', 'http://localhost:1234')
-    LMSTUDIO_MODEL = os.environ.get('LMSTUDIO_MODEL', 'local-model')
 
-# Hard-coded prompts
-ANALYSIS_PROMPT = """You are an expert prompt engineer. Analyze the following prompt and provide a detailed assessment covering:
-
-1. **Clarity**: How clear and unambiguous is the prompt?
-2. **Specificity**: Does it provide enough context and constraints?
-3. **Structure**: Is it well-organized and logical?
-4. **Completeness**: Are there missing elements that would improve results?
-5. **Potential Issues**: What problems might arise with this prompt?
-
-Provide specific, actionable feedback.
-
-Prompt to analyze:
-{prompt}
-
-Analysis:"""
-
-OPTIMIZATION_PROMPT = """You are an expert prompt engineer. Based on the analysis below, create an optimized version of the original prompt that addresses the identified issues and incorporates best practices.
-
-Original prompt:
-{original_prompt}
-
-Analysis:
-{analysis}
-
-Optimized prompt:"""
-
+    # Prompt refiners - load as class methods to handle errors properly
+    @classmethod
+    def load_prompt_template(cls, filename: str) -> str:
+        """Load a prompt template file with proper error handling"""
+        try:
+            # Use absolute path relative to this script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(script_dir, 'templates', filename)
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError:
+            logger.error(f"Prompt template file not found: {filename}")
+            return f"Error: Template file '{filename}' not found"
+        except Exception as e:
+            logger.error(f"Error reading prompt template {filename}: {e}")
+            return f"Error loading template: {e}"
+    
+    @classmethod
+    def get_prompt_refiner_1(cls) -> str:
+        """Get the first prompt refiner template"""
+        return cls.load_prompt_template('prompt.refiner.part1.md')
+    
+    @classmethod
+    def get_prompt_refiner_2(cls) -> str:
+        """Get the second prompt refiner template"""
+        return cls.load_prompt_template('prompt.refiner.part2.md')
+        
 class LLMBackend:
     """Abstract base for LLM backends"""
     
@@ -74,61 +76,48 @@ class LLMBackend:
     def is_available(self) -> bool:
         raise NotImplementedError
 
-class MLXBackend(LLMBackend):
-    """MLX backend for Apple Silicon"""
-    
-    def __init__(self):
-        self.model = None
-        self.tokenizer = None
-        self._available = self._check_availability()
-    
-    def _check_availability(self) -> bool:
-        try:
-            import mlx.core as mx
-            from mlx_lm import load, generate
-            return True
-        except ImportError:
-            logger.info("MLX not available - install with: pip install mlx-lm")
-            return False
-        except Exception as e:
-            logger.warning(f"MLX check failed: {e}")
-            return False
-    
-    def _load_model(self):
-        if self.model is None:
-            try:
-                from mlx_lm import load
-                logger.info(f"Loading MLX model: {Config.MLX_MODEL}")
-                self.model, self.tokenizer = load(Config.MLX_MODEL)
-                logger.info("MLX model loaded successfully")
-            except Exception as e:
-                logger.error(f"Failed to load MLX model: {e}")
-                raise
+class MLXAPIBackend(LLMBackend):
+    """MLX backend using mlx_lm.server API"""
     
     def generate(self, prompt: str) -> str:
-        if not self.is_available():
-            raise RuntimeError("MLX backend not available")
-        
-        self._load_model()
-        
         try:
-            from mlx_lm import generate
-            
-            response = generate(
-                self.model,
-                self.tokenizer,
-                prompt=prompt,
-                max_tokens=Config.MLX_MAX_TOKENS,
-                temp=Config.MLX_TEMPERATURE,
-                verbose=False
+            response = requests.post(
+                f"{Config.MLX_API_URL}/v1/chat/completions",
+                json={
+                    "model": Config.MLX_MODEL,
+                    "max_completion_tokens": Config.MLX_MAX_TOKENS,
+                    "temperature": Config.MLX_TEMPERATURE,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                },
+                timeout=180  # 3 minutes - generous timeout for analysis/optimization
             )
-            return response
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
         except Exception as e:
-            logger.error(f"MLX generation failed: {e}")
+            logger.error(f"MLX API generation failed: {e}")
             raise
     
     def is_available(self) -> bool:
-        return self._available
+        try:
+            response = requests.get(f"{Config.MLX_API_URL}/health", timeout=2)
+            return response.status_code == 200
+        except:
+            # Try the chat endpoint if health endpoint doesn't exist
+            try:
+                response = requests.post(
+                    f"{Config.MLX_API_URL}/v1/chat/completions",
+                    json={
+                        "model": Config.MLX_MODEL,
+                        "max_completion_tokens": 1,
+                        "messages": [{"role": "user", "content": "test"}]
+                    },
+                    timeout=2
+                )
+                return True  # If it doesn't error immediately, server is up
+            except:
+                return False
 
 class OllamaBackend(LLMBackend):
     """Ollama backend"""
@@ -152,7 +141,7 @@ class OllamaBackend(LLMBackend):
     
     def is_available(self) -> bool:
         try:
-            response = requests.get(f"{Config.OLLAMA_URL}/api/tags", timeout=5)
+            response = requests.get(f"{Config.OLLAMA_URL}/api/tags", timeout=2)
             return response.status_code == 200
         except:
             return False
@@ -165,7 +154,7 @@ class LMStudioBackend(LLMBackend):
             response = requests.post(
                 f"{Config.LMSTUDIO_URL}/v1/completions",
                 json={
-                    "model": Config.LMSTUDIO_MODEL,
+                    "model": "local-model",
                     "prompt": prompt,
                     "max_tokens": 1024,
                     "temperature": 0.7
@@ -180,7 +169,7 @@ class LMStudioBackend(LLMBackend):
     
     def is_available(self) -> bool:
         try:
-            response = requests.get(f"{Config.LMSTUDIO_URL}/v1/models", timeout=5)
+            response = requests.get(f"{Config.LMSTUDIO_URL}/v1/models", timeout=2)
             return response.status_code == 200
         except:
             return False
@@ -196,7 +185,7 @@ class PromptOptimizer:
     def _select_backend(self) -> Optional[LLMBackend]:
         """Select the best available backend"""
         backends = {
-            'mlx': MLXBackend(),
+            'mlx': MLXAPIBackend(),
             'ollama': OllamaBackend(),
             'lmstudio': LMStudioBackend()
         }
@@ -210,7 +199,7 @@ class PromptOptimizer:
             else:
                 logger.warning(f"Requested backend {Config.LLM_BACKEND} not available")
         
-        # Auto-select: prefer MLX on macOS, then Ollama, then LM Studio
+        # Auto-select: prefer MLX API, then Ollama, then LM Studio
         for name in ['mlx', 'ollama', 'lmstudio']:
             backend = backends[name]
             if backend.is_available():
@@ -222,12 +211,12 @@ class PromptOptimizer:
     
     def analyze_prompt(self, prompt: str) -> str:
         """Analyze a prompt using the selected backend"""
-        analysis_input = ANALYSIS_PROMPT.format(prompt=prompt)
+        analysis_input = Config.get_prompt_refiner_1().format(prompt=prompt)
         return self.backend.generate(analysis_input)
     
     def optimize_prompt(self, original_prompt: str, analysis: str) -> str:
         """Optimize a prompt based on analysis"""
-        optimization_input = OPTIMIZATION_PROMPT.format(
+        optimization_input = Config.get_prompt_refiner_2().format(
             original_prompt=original_prompt,
             analysis=analysis
         )
@@ -261,24 +250,14 @@ def init_optimizer():
 @app.route('/')
 def index():
     """Main page"""
-    try:
-        # Simplified version that should definitely work
-        backend_status = {
-            'MLX': False,
-            'Ollama': False,
-            'LM Studio': False
-        }
-        
-        return render_template('index.html', backend_status=backend_status)
-    except Exception as e:
-        # If template fails, return simple HTML
-        return f'''
-        <html><body>
-        <h1>Prompt Optimizer</h1>
-        <p>Template error: {str(e)}</p>
-        <p>Flask is working, but template failed.</p>
-        </body></html>
-        '''
+    # Quick backend status check
+    backend_status = {
+        'MLX API': MLXAPIBackend().is_available(),
+        'Ollama': OllamaBackend().is_available(),
+        'LM Studio': LMStudioBackend().is_available()
+    }
+    
+    return render_template('index.html', backend_status=backend_status)
 
 @app.route('/api/optimize', methods=['POST'])
 def optimize():
@@ -315,7 +294,7 @@ def optimize():
 def status():
     """API endpoint for checking system status"""
     backend_status = {
-        'mlx': MLXBackend().is_available(),
+        'mlx_api': MLXAPIBackend().is_available(),
         'ollama': OllamaBackend().is_available(),
         'lmstudio': LMStudioBackend().is_available()
     }
@@ -329,23 +308,21 @@ def status():
         'active_backend': active_backend,
         'config': {
             'llm_backend': Config.LLM_BACKEND,
+            'mlx_api_url': Config.MLX_API_URL,
             'mlx_model': Config.MLX_MODEL,
-            'ollama_model': Config.OLLAMA_MODEL,
-            'lmstudio_model': Config.LMSTUDIO_MODEL
+            'ollama_url': Config.OLLAMA_URL,
+            'ollama_model': Config.OLLAMA_MODEL
         }
     })
 
 if __name__ == '__main__':
-    print(f"🚀 Prompt Optimizer starting...")
-    print(f"📝 Will be available at http://127.0.0.1:6000")
-    print(f"🔧 Starting Flask on 127.0.0.1:6000...")
+    print(f"🚀 Prompt Optimizer (MLX API Version) starting...")
+    print(f"📝 Will be available at http://127.0.0.1:5001")
+    print(f"🔧 Expected MLX API server at {Config.MLX_API_URL}")
+    print(f"💡 Start MLX server with: python -m mlx_lm.server --model {Config.MLX_MODEL} --host 127.0.0.1 --port 8080")
     
-    # Test that we can at least create the Flask app
     try:
-        print("✅ Flask app created successfully")
-        print("✅ Routes registered successfully")
-        print("🔧 Attempting to start server...")
-        app.run(host='127.0.0.1', port=6000, debug=False, use_reloader=False)
+        app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False)
     except Exception as e:
         print(f"❌ Failed to start Flask: {e}")
         import traceback

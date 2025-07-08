@@ -43,6 +43,10 @@ Priority Order (when LLM_BACKEND=auto):
 
 This ensures optimal performance on Apple Silicon while maintaining deployment flexibility.
 
+## Architecture Evolution
+
+The main application (`app.py`) uses the MLX API server approach, which evolved from an earlier direct MLX integration. A legacy version (`app_legacy.py`) with direct MLX integration is preserved for reference and debugging purposes. The API server approach was adopted to resolve threading/GIL issues and follows MLX community best practices.
+
 ## Technical Implementation
 
 ### Core Components

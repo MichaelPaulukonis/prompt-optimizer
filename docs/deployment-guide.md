@@ -7,7 +7,7 @@
 ### Architecture
 
 The final implementation uses:
-- **Flask Web App** (`app_mlx_api.py`) running on port 5001
+- **Flask Web App** (`app.py`) running on port 5001
 - **MLX API Server** (`mlx_lm.server`) running on port 8080  
 - **HTTP Communication** between Flask and MLX server
 
@@ -45,7 +45,7 @@ If you prefer manual control:
 2. **Terminal 2 - Start Flask App:**
    ```bash
    source venv/bin/activate
-   python app_mlx_api.py
+   python app.py
    ```
 
 3. **Access:** http://127.0.0.1:5001
