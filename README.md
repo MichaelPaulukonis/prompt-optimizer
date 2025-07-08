@@ -2,6 +2,8 @@
 
 A simple web application for analyzing and optimizing prompts using local LLMs. Supports MLX (Apple Silicon), Ollama, and LM Studio backends with automatic backend detection.
 
+![screenshot](./docs/prompt_optimizer_00.png)
+
 2-part Prompt optimizer from [Frequent_Limit337](https://www.reddit.com/r/ChatGPTPromptGenius/comments/1ktjk0p/i_build_a_prompt_that_can_make_any_prompt_10x/) on Reddit. I have made some changes to part 1, but not to part 2.
 
 - another variant:
@@ -14,6 +16,9 @@ Also made use of the following web references:
 <https://stackoverflow.com/questions/64810921/kubernetes-official-tutorial-the-web-page-at-http-localhost6000-might-be-te>
 
 This app was heavily assisted by Github Copilot with Claude Sonnet 4.
+
+![screenshot](./docs/prompt_optimizer_01.png)
+
 
 ## 🚀 Quick Start
 
