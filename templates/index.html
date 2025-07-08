@@ -51,7 +51,7 @@
                 <div class="result-box">
                     <h2>✨ Optimized Prompt</h2>
                     <div id="optimizedResult" class="result-content"></div>
-                    <button onclick="copyToClipboard('optimizedResult')" class="copy-btn">
+                    <button onclick="copyToClipboard('optimizedResult', this)" class="copy-btn">
                         📋 Copy Optimized Prompt
                     </button>
                 </div>
@@ -71,14 +71,16 @@
         <footer>
             <p>
                 <a href="/api/status" target="_blank">System Status</a> | 
-                <a href="https://github.com/yourusername/prompt-optimizer" target="_blank">GitHub</a>
+                <a href="https://github.com/michaelpaulukonis/prompt-optimizer" target="_blank">GitHub</a>
             </p>
         </footer>
     </div>
 
     <script>
         async function optimizePrompt() {
-            const promptInput = document.getElementById('promptInput');
+            const promptInput = getElement('promptInput');
+            if (!promptInput) return;
+            
             const prompt = promptInput.value.trim();
             
             if (!prompt) {
@@ -100,6 +102,10 @@
                     body: JSON.stringify({ prompt: prompt })
                 });
 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
 
                 if (data.success) {
@@ -115,48 +121,82 @@
         }
 
         function showLoading() {
-            document.getElementById('loadingSection').style.display = 'block';
-            document.getElementById('optimizeBtn').disabled = true;
+            const loadingSection = getElement('loadingSection');
+            const optimizeBtn = getElement('optimizeBtn');
+            
+            if (loadingSection) {
+                loadingSection.style.display = 'block';
+                // Add aria-live for screen readers
+                loadingSection.setAttribute('aria-live', 'polite');
+            }
+            if (optimizeBtn) {
+                optimizeBtn.disabled = true;
+            }
         }
 
         function hideLoading() {
-            document.getElementById('loadingSection').style.display = 'none';
-            document.getElementById('optimizeBtn').disabled = false;
+            const loadingSection = getElement('loadingSection');
+            const optimizeBtn = getElement('optimizeBtn');
+            
+            if (loadingSection) {
+                loadingSection.style.display = 'none';
+            }
+            if (optimizeBtn) {
+                optimizeBtn.disabled = false;
+            }
         }
 
         function showResults(analysis, optimized, backend) {
-            document.getElementById('analysisResult').textContent = analysis;
-            document.getElementById('optimizedResult').textContent = optimized;
-            document.getElementById('backendUsed').textContent = backend;
-            document.getElementById('resultsSection').style.display = 'block';
+            const analysisResult = getElement('analysisResult');
+            const optimizedResult = getElement('optimizedResult');
+            const backendUsed = getElement('backendUsed');
+            const resultsSection = getElement('resultsSection');
+            
+            if (analysisResult) analysisResult.textContent = analysis;
+            if (optimizedResult) optimizedResult.textContent = optimized;
+            if (backendUsed) backendUsed.textContent = backend;
+            if (resultsSection) resultsSection.style.display = 'block';
         }
 
         function hideResults() {
-            document.getElementById('resultsSection').style.display = 'none';
+            const resultsSection = getElement('resultsSection');
+            if (resultsSection) {
+                resultsSection.style.display = 'none';
+            }
         }
 
         function showError(message) {
-            document.getElementById('errorMessage').textContent = message;
-            document.getElementById('errorSection').style.display = 'block';
+            const errorMessage = getElement('errorMessage');
+            const errorSection = getElement('errorSection');
+            
+            if (errorMessage) errorMessage.textContent = message;
+            if (errorSection) errorSection.style.display = 'block';
         }
 
         function hideError() {
-            document.getElementById('errorSection').style.display = 'none';
+            const errorSection = getElement('errorSection');
+            if (errorSection) {
+                errorSection.style.display = 'none';
+            }
         }
 
-        async function copyToClipboard(elementId) {
-            const element = document.getElementById(elementId);
+        async function copyToClipboard(elementId, buttonElement) {
+            const element = getElement(elementId);
+            if (!element || !buttonElement) {
+                showError('Copy failed: element not found.');
+                return;
+            }
+            
             const text = element.textContent;
             
             try {
                 await navigator.clipboard.writeText(text);
                 
                 // Show feedback
-                const button = event.target;
-                const originalText = button.textContent;
-                button.textContent = '✅ Copied!';
+                const originalText = buttonElement.textContent;
+                buttonElement.textContent = '✅ Copied!';
                 setTimeout(() => {
-                    button.textContent = originalText;
+                    buttonElement.textContent = originalText;
                 }, 2000);
             } catch (err) {
                 console.error('Failed to copy text: ', err);
@@ -164,15 +204,30 @@
             }
         }
 
-        // Allow Enter + Ctrl/Cmd to submit
-        document.getElementById('promptInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                optimizePrompt();
+        // Utility function to safely get DOM elements
+        function getElement(id) {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.error(`Element with id '${id}' not found`);
+            }
+            return element;
+        }
+
+        // Initialize the app when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Allow Enter + Ctrl/Cmd to submit
+            const promptInput = getElement('promptInput');
+            if (promptInput) {
+                promptInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        optimizePrompt();
+                    }
+                });
+
+                // Auto-focus the input
+                promptInput.focus();
             }
         });
-
-        // Auto-focus the input
-        document.getElementById('promptInput').focus();
     </script>
 </body>
 </html>

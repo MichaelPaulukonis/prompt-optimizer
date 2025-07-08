@@ -2,7 +2,8 @@
 
 A simple web application for analyzing and optimizing prompts using local LLMs. Supports MLX (Apple Silicon), Ollama, and LM Studio backends with automatic backend detection.
 
-2-part Prompt optimizer from someondy on Reddit (TODO: find back and cite them).
+2-part Prompt optimizer from [Frequent_Limit337](https://www.reddit.com/r/ChatGPTPromptGenius/comments/1ktjk0p/i_build_a_prompt_that_can_make_any_prompt_10x/) on Reddit. I have made some changes to part 1, but not to part 2.
+
 - another variant:
   - https://www.reddit.com/r/ChatGPTPromptGenius/comments/1jfe7mu/turn_any_prompt_into_the_perfect_prompt_with_this/
 

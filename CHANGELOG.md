@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.1] - 2025-07-07 - JavaScript Robustness Improvements
+
+### 🐛 Bug Fixes
+- **Fixed undefined `event` error in copyToClipboard function**: Modified function signature to explicitly pass button element parameter instead of relying on global event object
+- **Added comprehensive error handling**: All DOM element access now includes null checks and graceful error handling
+- **Fixed potential race conditions**: Wrapped initialization code in DOMContentLoaded event listener
+
+### 🔧 Technical Improvements
+- **Added safe DOM element access**: Created `getElement()` utility function with error logging for missing elements
+- **Enhanced HTTP error handling**: Added response status checking in fetch requests
+- **Improved accessibility**: Added `aria-live` attribute to loading section for screen reader support
+- **Robust function guards**: Functions now fail gracefully with early returns when critical elements are missing
+
+### 📝 Code Quality
+- **Consistent error handling patterns**: All functions now use the same safe element access pattern
+- **Better separation of concerns**: Initialization code moved to proper event handlers
+- **Improved debugging**: Added console error logging for missing DOM elements
+
 ## [1.0.0] - 2025-07-06 - Initial Release
 
 ### ✅ Completed Features
